@@ -6,11 +6,11 @@
 using namespace std;
 
 // #def data folder
-#define image_path "sp_noise/Image1.png"
+#define image_path "sp_noise/Image3.png"
 
 // run using: g++ -std=c++11 main.cpp -o main `pkg-config --cflags --libs opencv`
 
-cv::Mat NL_Means(cv::Mat src, int h = 20, int windowSize=9, int searchWindowSize=23)
+cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=7)
 {
     int rows = src.rows;
     int cols = src.cols;
@@ -22,7 +22,7 @@ cv::Mat NL_Means(cv::Mat src, int h = 20, int windowSize=9, int searchWindowSize
     cout << "Performing NL_Means on the Image" << endl;
 
     vector<vector<float> > paddedImage = padImage(src, searchWindowSize);
-    // paddedImage = floatImage(paddedImage);
+    paddedImage = floatImage(paddedImage);
 
     vector<vector<float> > outputImage(rows, vector<float>(cols));
 
@@ -45,7 +45,7 @@ cv::Mat NL_Means(cv::Mat src, int h = 20, int windowSize=9, int searchWindowSize
                     // cout<<dist<<endl;
                     dist = sqrt(dist);
                     // cout<<dist<<endl;
-                    float w = exp(-dist/(h*h));
+                    float w = exp(-dist/(h));
 
                     weightedSum += w*paddedImage[i+k+halfSearchWindowSize][j+l+halfSearchWindowSize];
                     similaritySum += w;
@@ -58,7 +58,7 @@ cv::Mat NL_Means(cv::Mat src, int h = 20, int windowSize=9, int searchWindowSize
         }
     }
 
-    // outputImage = intImage(outputImage);
+    outputImage = intImage(outputImage);
 
     cv::Mat dst = Vec2Mat(outputImage, "outputImage.png");
     
@@ -71,9 +71,7 @@ int main(int argc, char **argv)
     // string image_path
     cout << "Loading image " << image_path << endl;
 
-    // cv::Mat src = cv::imread(image_path,cv::IMREAD_GRAYSCALE);
-
-    cv::Mat src = cv::imread("sp_noise/Image2.png", cv::IMREAD_GRAYSCALE);
+    cv::Mat src = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
 
     cout << "Shape of image: " << src.size() << endl;
 
