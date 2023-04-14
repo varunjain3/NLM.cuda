@@ -17,10 +17,11 @@ using namespace std;
 // run using: nvcc -std=c++11 main.cpp -o main `pkg-config --cflags --libs opencv`
 
 // /*
-__global__ void pixel_kernel_call(float* paddedImage, float* outputImage, int rows, int cols, int windowSize, int searchWindowSize, int h) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-
+__global__ void pixel_kernel_call(float* paddedImage, float* outputImage, int cols, int windowSize, int searchWindowSize, int h, int i) {
+    // printf("Hello World!");
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    // int j = blockIdx.y * blockDim.y + threadIdx.y;
+    // printf("j: %d", j);
     int halfWindowSize = windowSize / 2;
     int halfSearchWindowSize = searchWindowSize / 2;
 
@@ -61,18 +62,21 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize = 3, int searchWindowSiz
 
     cout << "Performing NL_Means on the Image" << endl;
 
-    vector<vector<float>> paddedImage = padImage(src, searchWindowSize);
+    vector<vector<float>> paddedImage_temp = padImage(src, searchWindowSize);
 
-    paddedImage = floatImage(paddedImage);
+    paddedImage_temp = floatImage(paddedImage_temp);
+    float* paddedImage = vec_to_float_arr(paddedImage_temp);
 
     float *outputImage;
     float *dev_pad, *dev_out_img;
 
-
     // vector<vector<float>> outputImage
 
     // size_t N = 128;
-    size_t pad_arr_len = paddedImage.size() * paddedImage[0].size();
+    vector<int> sizes = get_sizes(paddedImage_temp);
+    size_t pad_arr_len = sizes[0] * sizes[1];
+    outputImage = (float *)malloc(pad_arr_len*sizeof(float));
+    // size_t pad_arr_len = paddedImage.size() * paddedImage[0].size();
     
     //create buffer on device
     cudaError_t err = cudaMalloc(&dev_pad, pad_arr_len*sizeof(float));
@@ -80,8 +84,8 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize = 3, int searchWindowSiz
         cout<<"Dev Memory not allocated"<<endl;
         exit(-1);
     }
-    cudaError_t err = cudaMalloc(&dev_out_img, pad_arr_len*sizeof(float));
-    if (err != cudaSuccess){
+    cudaError_t err2 = cudaMalloc(&dev_out_img, pad_arr_len*sizeof(float));
+    if (err2 != cudaSuccess){
         cout<<"Dev Memory not allocated"<<endl;
         exit(-1);
     }
@@ -96,24 +100,31 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize = 3, int searchWindowSiz
     cout << "Blocks: " << numBlocks.x << "x" << numBlocks.y << endl;
     cout << "Threads per block: " << threadsperblock.x << "x" << threadsperblock.y << endl;
 
+    //CREATE MULTIPLE STREAMS HERE
+    int num_streams = 4;
+    cudaStream_t streams[num_streams];
+    for (int i = 0; i < num_streams; i++) {
+      cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking);
+    }
+    cout<<"main rows: "<<rows<<" ; cols: "<< cols<< endl;
     for (int i = 0; i < rows; i++)
     {
-        cout << i << endl;
-        for (int j = 0; j < cols; j++)
-        {
-            pixel_kernel_call<<<blockspergrid, threadsperblock>>>(dev_pad, dev_out_img, cols, windowSize, searchWindowSize, h);
-        }
+    //     cout << i << endl;
+    //     for (int j = 0; j < cols; j++)
+    //     {
+    pixel_kernel_call<<<1, 128, 0, streams[0]>>>(dev_pad, dev_out_img, cols, windowSize, searchWindowSize, h, i);
+    //     }
     }
 
     cudaMemcpy(outputImage, dev_out_img, pad_arr_len * sizeof(float), cudaMemcpyHostToDevice);
 
     cout << "Done" << endl;
 
-    // outputImage = intImage(outputImage);
+    vector<vector<float> > new_outputImage = intImage(outputImage, sizes[0], sizes[1]);
+    cout<<"Saving image"<< endl;
+    cv::Mat dst = Vec2Mat(new_outputImage, "outputImage.png");
 
-    // cv::Mat dst = Vec2Mat(outputImage, "outputImage.png");
-
-    return src;
+    return dst;
 }
 
 int main(int argc, char **argv)

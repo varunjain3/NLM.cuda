@@ -92,3 +92,42 @@ vector<vector<float> > intImage(vector<vector<float> > image){
     return intImage;
 }
 
+
+vector<vector<float> > intImage(float* image, int rows, int cols){
+    vector<vector<float> > intImage(rows, vector<float>(cols));
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            intImage[i][j] = (int)(image[i+j*rows]*255.0);
+        }
+    }
+
+    return intImage;
+}
+
+
+float* vec_to_float_arr(vector<vector<float> > image){
+    int rows = image.size();
+    int cols = image[0].size();
+
+    float* floatImage = new float[rows*cols];
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            floatImage[i*cols+j] = image[i][j];
+        }
+    }
+
+    return floatImage;
+}
+
+vector<int> get_sizes(vector<vector<float> > image){
+    vector<int> sizes;
+    sizes.push_back(image.size());
+    sizes.push_back(image[0].size());
+    return sizes;
+}
