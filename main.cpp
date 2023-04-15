@@ -40,8 +40,14 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=
                     for(int m=-halfWindowSize; m<=halfWindowSize; m++){
                         for(int n=-halfWindowSize; n<=halfWindowSize; n++){
                             dist += pow(paddedImage[i+k+halfSearchWindowSize][j+l+halfSearchWindowSize] - paddedImage[i+m+halfSearchWindowSize][j+n+halfSearchWindowSize], 2);
+                            // cout<< i+k+halfSearchWindowSize << " : "<< j+l+halfSearchWindowSize << " \n ";
+                            // cout<< i+m+halfSearchWindowSize << " : "<< j+n+halfSearchWindowSize <<endl;
+                            // if (i+k+halfSearchWindowSize < 0 || j+l+halfSearchWindowSize < 0 || i+m+halfSearchWindowSize < 0 || j+n+halfSearchWindowSize < 0){
+                            //     cout<<"negative index"<<endl;
+                            // }
                         }
                     }
+                    // cin>>dist;
                     // cout<<dist<<endl;
                     dist = sqrt(dist);
                     // cout<<dist<<endl;
@@ -59,6 +65,15 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=
     }
 
     outputImage = intImage(outputImage);
+
+    // for (int i = 0; i < outputImage.size(); i++)
+    // {
+    //     for (int j = 0; j < outputImage[0].size(); j++)
+    //     {
+    //         cout<<outputImage[i][j]<<" ";
+    //     }
+    //     break;
+    // }
 
     cv::Mat dst = Vec2Mat(outputImage, "outputImage.png");
     

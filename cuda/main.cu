@@ -3,56 +3,112 @@
 #include <vector>
 #include "helper.h"
 
-#define imgH 1024
-#define imgW 1024
-#define sWindowSize 7
-#define nWindowSize 3
-#define image_path "../sp_noise/Image3.png"
-
 using namespace std;
 
 // #def data folder
+#define image_path "../sp_noise/Image3.png"
 
 // run using: g++ -std=c++11 main.cpp -o main `pkg-config --cflags --libs opencv`
-// run using: nvcc -std=c++11 main.cpp -o main `pkg-config --cflags --libs opencv`
 
-// /*
-__global__ void pixel_kernel_call(float* paddedImage, float* outputImage, int cols, int windowSize, int searchWindowSize, int h, int i) {
-    // printf("Hello World!");
-    int j = blockIdx.x * blockDim.x + threadIdx.x;
-    // int j = blockIdx.y * blockDim.y + threadIdx.y;
-    // printf("j: %d", j);
-    int halfWindowSize = windowSize / 2;
-    int halfSearchWindowSize = searchWindowSize / 2;
 
-    float weightedSum = 0;
-    float similaritySum = 0;
+void check_func(float* outputImage, int cols, int halfWindowSize, int halfSearchWindowSize, int h, int rows, float* paddedImage1){
+    // float** paddedImage = new float*[270];
+    // for (int i = 0; i < 270; i++)
+    //     paddedImage[i] = new float[270];
+    
+    // for (int i = 0; i < 270; i++){
+    //     for (int j = 0; j < 270; j++){
+    //         paddedImage[i][j] = paddedImage1[i*270 + j];
+    //     }
+    // }
 
-    for(int k=-halfSearchWindowSize; k<=halfSearchWindowSize; k++){
-        for(int l=-halfSearchWindowSize; l<=halfSearchWindowSize; l++){
-            float dist = 0;
-            for(int m=-halfWindowSize; m<=halfWindowSize; m++){
-                for(int n=-halfWindowSize; n<=halfWindowSize; n++){
-                    dist += pow(paddedImage[(i+k+halfSearchWindowSize)*cols + (j+l+halfSearchWindowSize)] - paddedImage[(i+m+halfSearchWindowSize)*cols + (j+n+halfSearchWindowSize)], 2);
+    for(int i=0; i<rows;i++){
+        // cout<<i<<endl;
+        for(int j=0; j<cols; j++){
+            float weightedSum = 0;
+            float similaritySum = 0;
+
+            for(int k=-halfSearchWindowSize; k<=halfSearchWindowSize; k++){
+                for(int l=-halfSearchWindowSize; l<=halfSearchWindowSize; l++){
+                    float dist = 0;
+                    float tempWeightedSum = 0;
+                    float tempSimilaritySum = 0;
+                    for(int m=-halfWindowSize; m<=halfWindowSize; m++){
+                        for(int n=-halfWindowSize; n<=halfWindowSize; n++){
+                            dist += pow(paddedImage1[(i+k+halfSearchWindowSize)*270 + (j+l+halfSearchWindowSize)] - 
+                            paddedImage1[(i+m+halfSearchWindowSize)*270 + (j+n+halfSearchWindowSize)], 2);
+                        }
+                    }
+                    // cout<<dist<<endl;
+                    dist = sqrt(dist);
+                    // cout<<dist<<endl;
+                    float w = exp(-dist/(h));
+
+                    weightedSum += w*paddedImage1[(i+k+halfSearchWindowSize)*270 + (j+l+halfSearchWindowSize)];
+                    similaritySum += w;
                 }
             }
-            // cout<<dist<<endl;
-            dist = sqrt(dist);
-            // cout<<dist<<endl;
-            float w = exp(-dist/(h));
+            float intensity = weightedSum/similaritySum;
+            // cout<<intensity<<endl;
+            outputImage[i*rows + j] = intensity;
 
-            weightedSum += w*paddedImage[(i+k+halfSearchWindowSize)*cols + (j+l+halfSearchWindowSize)];
-            similaritySum += w;
         }
     }
-    float intensity = weightedSum/similaritySum;
-    // cout<<intensity<<endl;
-    outputImage[i*cols + j] = intensity;
 }
 
-// */
 
-cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize = 3, int searchWindowSize = 7)
+__global__ void pixel_kernel_call(float* paddedImage, float* outputImage, int cols, int halfWindowSize, int halfSearchWindowSize, int h, int rows, int i){
+    // printf("cols: %d", cols);
+    __shared__ float share_buf[256];
+
+    //  printf("i: %d", i);
+    for (int xx = 0;xx < cols/128; xx++) {
+        int j = threadIdx.x + (128*xx);
+        // printf("j: %d\n", j);
+        if (j >= cols) {
+            printf("Thread exceeded cols: %d", j);
+            break;
+        }
+
+        float weightedSum = 0;
+        float similaritySum = 0;
+
+        for(int k=-halfSearchWindowSize; k<=halfSearchWindowSize; k++){
+            for(int l=-halfSearchWindowSize; l<=halfSearchWindowSize; l++){
+                float dist = 0;
+                float tempWeightedSum = 0;
+                float tempSimilaritySum = 0;
+                for(int m=-halfWindowSize; m<=halfWindowSize; m++){
+                    for(int n=-halfWindowSize; n<=halfWindowSize; n++){
+                        dist += pow(paddedImage[(i+k+halfSearchWindowSize)*270 + (j+l+halfSearchWindowSize)] - 
+                        paddedImage[(i+m+halfSearchWindowSize)*270 + (j+n+halfSearchWindowSize)], 2);
+                    }
+                }
+                // cout<<dist<<endl;
+                dist = sqrt(dist);
+                // cout<<dist<<endl;
+                float w = exp(-dist/(h));
+
+                weightedSum += w*paddedImage[(i+k+halfSearchWindowSize)*270 + (j+l+halfSearchWindowSize)];
+                similaritySum += w;
+            }
+        }
+        float intensity = weightedSum/similaritySum;
+        share_buf[j] = intensity;
+        // cout<<intensity<<endl;
+        // outputImage[i][j] = intensity;
+    }
+
+    __syncthreads();
+        for (int jt = 0;jt < cols; jt++) {
+            // printf("here");
+            outputImage[i*rows + jt] = share_buf[jt];
+        }
+    
+}
+
+
+cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=7)
 {
     int rows = src.rows;
     int cols = src.cols;
@@ -60,90 +116,71 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize = 3, int searchWindowSiz
     int halfWindowSize = windowSize / 2;
     int halfSearchWindowSize = searchWindowSize / 2;
 
+
     cout << "Performing NL_Means on the Image" << endl;
 
+   
     vector<vector<float>> paddedImage_temp = padImage(src, searchWindowSize);
-
     paddedImage_temp = floatImage(paddedImage_temp);
-    float* paddedImage = vec_to_float_arr(paddedImage_temp);
 
-    float *outputImage;
-    float *dev_pad, *dev_out_img;
+    float* paddedImage = vec_to_float_arr(paddedImage_temp, 0);
 
-    // vector<vector<float>> outputImage
-
-    // size_t N = 128;
+   
+    float* outputImage = (float*) malloc(rows * cols * sizeof(float));
+    
     vector<int> sizes = get_sizes(paddedImage_temp);
     size_t pad_arr_len = sizes[0] * sizes[1];
-    outputImage = (float *)malloc(pad_arr_len*sizeof(float));
-    // size_t pad_arr_len = paddedImage.size() * paddedImage[0].size();
     
-    //create buffer on device
+    float* dev_pad;
+    float* dev_out_img;
+     //create buffer on device
     cudaError_t err = cudaMalloc(&dev_pad, pad_arr_len*sizeof(float));
     if (err != cudaSuccess){
         cout<<"Dev Memory not allocated"<<endl;
         exit(-1);
     }
-    cudaError_t err2 = cudaMalloc(&dev_out_img, pad_arr_len*sizeof(float));
+    cudaError_t err2 = cudaMalloc(&dev_out_img, rows*cols*sizeof(float));
     if (err2 != cudaSuccess){
         cout<<"Dev Memory not allocated"<<endl;
         exit(-1);
     }
 
+   
+    cout<<"main rows: "<<rows<<" ; cols: "<< cols<< endl;
+    cout<<"padd rows: "<<sizes[0]<<" ; cols: "<< sizes[1]<< endl;
     cudaMemcpy(dev_pad, paddedImage, pad_arr_len * sizeof(float), cudaMemcpyHostToDevice);
-    size_t threads = 16;
-    dim3 threadsperblock(threads, threads);
-    dim3 numBlocks(threads*threads/threadsperblock.x,  threads*threads/threadsperblock.y);
-
-    // print parameters
-    cout << "Threads: " << threads << endl;
-    cout << "Blocks: " << numBlocks.x << "x" << numBlocks.y << endl;
-    cout << "Threads per block: " << threadsperblock.x << "x" << threadsperblock.y << endl;
-
     //CREATE MULTIPLE STREAMS HERE
-    int num_streams = 4;
+    int num_streams = 16;
     cudaStream_t streams[num_streams];
     for (int i = 0; i < num_streams; i++) {
       cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking);
     }
-    cout<<"main rows: "<<rows<<" ; cols: "<< cols<< endl;
-    for (int i = 0; i < rows; i++)
-    {
-    //     cout << i << endl;
-    //     for (int j = 0; j < cols; j++)
-    //     {
-    pixel_kernel_call<<<1, 128, 0, streams[0]>>>(dev_pad, dev_out_img, cols, windowSize, searchWindowSize, h, i);
-    //     }
+    // for (int i = 0; i < rows; i++)
+    // {
+    // cout<<"Starting kernel call"<<endl;
+    for (int i = 0; i < rows;i++){
+        pixel_kernel_call<<<1, 128, 0, streams[i%num_streams]>>>(dev_pad, dev_out_img, cols, halfWindowSize, halfSearchWindowSize, h, rows, i);
     }
+   
+    cudaDeviceSynchronize();
+    cudaMemcpy(outputImage, dev_out_img, rows*cols * sizeof(float), cudaMemcpyDeviceToHost);
+   
+    vector<vector<float> > new_outputImage = intImage(outputImage, rows, cols);
 
-    cudaMemcpy(outputImage, dev_out_img, pad_arr_len * sizeof(float), cudaMemcpyHostToDevice);
+    cout<<"Saving Image"<<endl;
 
-    cout << "Done" << endl;
-
-    vector<vector<float> > new_outputImage = intImage(outputImage, sizes[0], sizes[1]);
-    cout<<"Saving image"<< endl;
     cv::Mat dst = Vec2Mat(new_outputImage, "outputImage.png");
-
+    
     return dst;
 }
 
 int main(int argc, char **argv)
 {
-    int searchWindowSize = sWindowSize;
-    int windowSize = nWindowSize;
 
     // string image_path
     cout << "Loading image " << image_path << endl;
 
     cv::Mat src = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
-    // save original shape of image
-    int OrignalH = src.rows;
-    int OrignalW = src.cols;
-
-    cv::resize(src, src, cv::Size(imgH - 2 * searchWindowSize, imgW - 2 * searchWindowSize));
-
-
-    
 
     cout << "Shape of image: " << src.size() << endl;
 
@@ -154,11 +191,7 @@ int main(int argc, char **argv)
         cout << "Usage: " << argv[0] << " <Input image>" << endl;
         return -1;
     }
-    
-    cv::Mat dst = NL_Means(src, 2, windowSize, searchWindowSize);
-
-    cv::resize(dst, dst, cv::Size(OrignalH, OrignalW));
-    cv::imwrite("output.png", dst);
+    NL_Means(src);
 
     return 0;
 }

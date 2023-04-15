@@ -22,6 +22,23 @@ cv::Mat Vec2Mat(vector<vector<float> > image, string name = "temp.png"){
     return dst;
 }
 
+void Vec2Mat(float* image, int rows, int cols, string name = "temp.png"){
+    // int rows = image.size();
+    // int cols = image[0].size();
+    
+    // one channel image
+    cv::Mat dst = cv::Mat::zeros(rows, cols, CV_64F);
+
+    for (int i = 0; i < rows; i++)
+        for (int j = 0; j < cols; j++)
+            dst.at<double>(i, j) = image[i*rows+j];
+
+    cv::imwrite(name, dst);
+
+    
+    // return dst;
+}
+
 vector<vector<float> > padImage(cv::Mat image, int padding)
 {
 
@@ -93,14 +110,14 @@ vector<vector<float> > intImage(vector<vector<float> > image){
 }
 
 
-vector<vector<float> > intImage(float* image, int rows, int cols){
+vector<vector<float> > intImage(float** image, int rows, int cols){
     vector<vector<float> > intImage(rows, vector<float>(cols));
 
     for (int i = 0; i < rows; i++)
     {
         for (int j = 0; j < cols; j++)
         {
-            intImage[i][j] = (int)(image[i+j*rows]*255.0);
+            intImage[i][j] = (int)(image[i][j]*255.0);
         }
     }
 
@@ -108,17 +125,52 @@ vector<vector<float> > intImage(float* image, int rows, int cols){
 }
 
 
-float* vec_to_float_arr(vector<vector<float> > image){
-    int rows = image.size();
-    int cols = image[0].size();
-
-    float* floatImage = new float[rows*cols];
+vector<vector<float> > intImage(float* image, int rows, int cols){
+    vector<vector<float> > intImage(rows, vector<float>(cols));
 
     for (int i = 0; i < rows; i++)
     {
         for (int j = 0; j < cols; j++)
         {
-            floatImage[i*cols+j] = image[i][j];
+            intImage[i][j] = (int)(image[i*rows + j]*255.0);
+        }
+    }
+
+    return intImage;
+}
+
+float** vec_to_float_arr(vector<vector<float> > image){
+    int rows = image.size();
+    int cols = image[0].size();
+
+    float** floatImage = new float*[rows];
+
+
+    for (int i = 0; i < rows; i++)
+    {
+        floatImage[i] = new float[cols];
+        for (int j = 0; j < cols; j++)
+        {
+            floatImage[i][j] = image[i][j];
+        }
+    }
+
+    return floatImage;
+}
+
+float* vec_to_float_arr(vector<vector<float> > image, int data){
+    int rows = image.size();
+    int cols = image[0].size();
+
+    float* floatImage = new float[rows*cols];
+
+
+    for (int i = 0; i < rows; i++)
+    {
+        // floatImage[i] = new float[cols];
+        for (int j = 0; j < cols; j++)
+        {
+            floatImage[i*rows + j] = image[i][j];
         }
     }
 
