@@ -10,7 +10,7 @@ using namespace std;
 
 // run using: g++ -std=c++11 main.cpp -o main `pkg-config --cflags --libs opencv`
 
-cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=7)
+cv::Mat NL_Means(cv::Mat src, float h = 0.5, int windowSize=11, int searchWindowSize=23)
 {
     int rows = src.rows;
     int cols = src.cols;
@@ -21,7 +21,7 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=
 
     cout << "Performing NL_Means on the Image" << endl;
 
-    vector<vector<float> > paddedImage = padImage(src, searchWindowSize);
+    vector<vector<float> > paddedImage = padImage(src, 2*halfSearchWindowSize + 2*halfWindowSize);
     paddedImage = floatImage(paddedImage);
 
     vector<vector<float> > outputImage(rows, vector<float>(cols));
@@ -39,7 +39,7 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=
                     float tempSimilaritySum = 0;
                     for(int m=-halfWindowSize; m<=halfWindowSize; m++){
                         for(int n=-halfWindowSize; n<=halfWindowSize; n++){
-                            dist += pow(paddedImage[i+k+halfSearchWindowSize][j+l+halfSearchWindowSize] - paddedImage[i+m+halfSearchWindowSize][j+n+halfSearchWindowSize], 2);
+                            dist += pow(paddedImage[i+m+k+halfSearchWindowSize+halfWindowSize][j+n+l+halfSearchWindowSize+halfWindowSize] - paddedImage[i+m+halfSearchWindowSize+halfWindowSize][j+n+halfSearchWindowSize+halfWindowSize], 2);
                             // cout<< i+k+halfSearchWindowSize << " : "<< j+l+halfSearchWindowSize << " \n ";
                             // cout<< i+m+halfSearchWindowSize << " : "<< j+n+halfSearchWindowSize <<endl;
                             // if (i+k+halfSearchWindowSize < 0 || j+l+halfSearchWindowSize < 0 || i+m+halfSearchWindowSize < 0 || j+n+halfSearchWindowSize < 0){
@@ -53,7 +53,7 @@ cv::Mat NL_Means(cv::Mat src, int h = 2, int windowSize=3, int searchWindowSize=
                     // cout<<dist<<endl;
                     float w = exp(-dist/(h));
 
-                    weightedSum += w*paddedImage[i+k+halfSearchWindowSize][j+l+halfSearchWindowSize];
+                    weightedSum += w*paddedImage[i+k+halfSearchWindowSize+halfWindowSize][j+l+halfSearchWindowSize+halfWindowSize];
                     similaritySum += w;
                 }
             }
