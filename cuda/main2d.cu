@@ -3,6 +3,7 @@
 #include <vector>
 #include "helper2d.h"
 #include <cuda_runtime.h>
+#include <chrono>
 
 using namespace std;
 
@@ -47,16 +48,16 @@ __global__ void perPixel(float *paddedImage, float *outputImage, int width, int 
 
     // printf("threadIdx.x: %d ; threadIdx.y: %d ", threadIdx.x, threadIdx.y);
 
-    if (threadIdx.x == 0 and threadIdx.y == 0 and blockIdx.x == 0 and blockIdx.y == 0)
-    {
-        printf("MAX_THREAD_DIM_SHARED: %d \n", MAX_THREAD_DIM_SHARED);
-        printf("i: %d ; j: %d \n", i, j);
-        printf("blockDim.x: %d ; blockDim.y: %d \n", blockDim.x, blockDim.y);
-        printf("blockIdx.x: %d ; blockIdx.y: %d \n", blockIdx.x, blockIdx.y);
-        printf("threadIdx.x: %d ; threadIdx.y: %d \n", threadIdx.x, threadIdx.y);
-        printf("height: %d ; width: %d \n", height, width);
-        printf("rows: %d ; cols: %d \n", rows, cols);
-    }
+    // if (threadIdx.x == 0 and threadIdx.y == 0 and blockIdx.x == 0 and blockIdx.y == 0)
+    // {
+    //     printf("MAX_THREAD_DIM_SHARED: %d \n", MAX_THREAD_DIM_SHARED);
+    //     printf("i: %d ; j: %d \n", i, j);
+    //     printf("blockDim.x: %d ; blockDim.y: %d \n", blockDim.x, blockDim.y);
+    //     printf("blockIdx.x: %d ; blockIdx.y: %d \n", blockIdx.x, blockIdx.y);
+    //     printf("threadIdx.x: %d ; threadIdx.y: %d \n", threadIdx.x, threadIdx.y);
+    //     printf("height: %d ; width: %d \n", height, width);
+    //     printf("rows: %d ; cols: %d \n", rows, cols);
+    // }
 
     // int padI = halfSearchWindowSize + halfWindowSize + i;
     // int padJ = halfSearchWindowSize + halfWindowSize + j;
@@ -154,10 +155,10 @@ cv::Mat NL_Means(cv::Mat src)
     int h = H;
     int halfWindowSize = nWindowSize / 2;
     int halfSearchWindowSize = sWindowSize / 2;
-    cout << "nWindowSize: " << nWindowSize << endl;
-    cout << "sWindowSize: " << sWindowSize << endl;
+    // cout << "nWindowSize: " << nWindowSize << endl;
+    // cout << "sWindowSize: " << sWindowSize << endl;
 
-    cout << "Performing NL_Means on the Image" << endl;
+    // cout << "Performing NL_Means on the Image" << endl;
 
     vector<vector<float>> paddedImageVec = padImage(src, sWindowSize);
     paddedImageVec = floatImage(paddedImageVec);
@@ -185,8 +186,8 @@ cv::Mat NL_Means(cv::Mat src)
         exit(-1);
     }
 
-    cout << "main rows: " << rows << " ; cols: " << cols << endl;
-    cout << "padd rows: " << height << " ; cols: " << width << endl;
+    // cout << "main rows: " << rows << " ; cols: " << cols << endl;
+    // cout << "padd rows: " << height << " ; cols: " << width << endl;
 
     cudaMemcpy(devicePaddedImage, paddedImage, height * width * sizeof(float), cudaMemcpyHostToDevice);
 
@@ -196,8 +197,8 @@ cv::Mat NL_Means(cv::Mat src)
     dim3 gridSize((rows + blockSize.x - 1) / blockSize.x, (cols + blockSize.y - 1) / blockSize.y);
     dim3 check(MAX_BLOCK_DIM, MAX_BLOCK_DIM);
 
-    cout << "Block size: " << blockSize.x << "x" << blockSize.y << endl;
-    cout << "Grid size: " << gridSize.x << "x" << gridSize.y << endl;
+    // cout << "Block size: " << blockSize.x << "x" << blockSize.y << endl;
+    // cout << "Grid size: " << gridSize.x << "x" << gridSize.y << endl;
 
     perPixel<<<check, blockSize>>>(devicePaddedImage, deviceOutputImage, width, height, rows, cols);
     cudaDeviceSynchronize();
@@ -206,50 +207,55 @@ cv::Mat NL_Means(cv::Mat src)
 
     vector<vector<float>> new_outputImage = intImage(outputImage, rows, cols);
 
-    cout << "Saving Image" << endl;
+    // cout << "Saving Image" << endl;
 
     cv::Mat dst;
     dst = Vec2Mat(new_outputImage, "outputImage.png");
+
+    cudaFree(devicePaddedImage);
+    cudaFree(deviceOutputImage);
+    free(paddedImage);
+    free(outputImage);
 
     return dst;
 }
 
 // check device properties
-void checkDevice()
-{
-    int device = 0;
-    int max_blocks_per_multiprocessor;
-    int num_multiprocessors;
-    int max_blocks_total;
-    cudaDeviceProp prop;
+// void checkDevice()
+// {
+//     int device = 0;
+//     int max_blocks_per_multiprocessor;
+//     int num_multiprocessors;
+//     int max_blocks_total;
+//     cudaDeviceProp prop;
 
-    cudaGetDeviceProperties(&prop, device);
-    cudaDeviceGetAttribute(&max_blocks_per_multiprocessor, cudaDevAttrMaxThreadsPerMultiProcessor, device);
-    cudaDeviceGetAttribute(&num_multiprocessors, cudaDevAttrMultiProcessorCount, device);
-    cudaDeviceGetAttribute(&max_blocks_total, cudaDevAttrMaxBlockDimX, device);
+//     cudaGetDeviceProperties(&prop, device);
+//     cudaDeviceGetAttribute(&max_blocks_per_multiprocessor, cudaDevAttrMaxThreadsPerMultiProcessor, device);
+//     cudaDeviceGetAttribute(&num_multiprocessors, cudaDevAttrMultiProcessorCount, device);
+//     cudaDeviceGetAttribute(&max_blocks_total, cudaDevAttrMaxBlockDimX, device);
 
-    int max_blocks = min(max_blocks_per_multiprocessor * num_multiprocessors, max_blocks_total);
+//     int max_blocks = min(max_blocks_per_multiprocessor * num_multiprocessors, max_blocks_total);
 
-    printf("\n---------------Device Properties---------------\n");
-    printf("Device name: %s\n", prop.name);
-    printf("Compute capability: %d.%d\n", prop.major, prop.minor);
-    printf("Maximum threads per block: %d\n", prop.maxThreadsPerBlock);
-    printf("Maximum number of blocks: %d\n", max_blocks);
-    printf("Number of multiprocessors: %d\n", prop.multiProcessorCount);
-    printf("Amount of shared memory per block: %lu bytes\n", prop.sharedMemPerBlock);
-    printf("-----------------------------------------------\n\n");
-}
+//     printf("\n---------------Device Properties---------------\n");
+//     printf("Device name: %s\n", prop.name);
+//     printf("Compute capability: %d.%d\n", prop.major, prop.minor);
+//     printf("Maximum threads per block: %d\n", prop.maxThreadsPerBlock);
+//     printf("Maximum number of blocks: %d\n", max_blocks);
+//     printf("Number of multiprocessors: %d\n", prop.multiProcessorCount);
+//     printf("Amount of shared memory per block: %lu bytes\n", prop.sharedMemPerBlock);
+//     printf("-----------------------------------------------\n\n");
+// }
 
 int main(int argc, char **argv)
 {
-
+    auto start_time = std::chrono::steady_clock::now(); 
     // string image_path
-    cout << "Loading image " << image_path << endl;
+    // cout << "Loading image " << image_path << endl;
     cv::Mat src = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
     src = resizeImage(src, imgH, imgW);
-    cout << "Shape of image: " << src.size() << endl;
+    // cout << "Shape of image: " << src.size() << endl;
 
-    checkDevice();
+    // checkDevice();
 
     if (src.empty())
     {
@@ -260,7 +266,11 @@ int main(int argc, char **argv)
     }
     NL_Means(src);
 
-    cout << "Done!" << endl;
+    // cout << "Done!" << endl;
+    auto end_time = std::chrono::steady_clock::now(); 
+    auto runtime = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time); 
+    
+    std::cout << "Runtime: " << runtime.count() << "ms" << std::endl; 
 
     return 0;
 }
