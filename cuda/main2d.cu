@@ -35,56 +35,23 @@ __global__ void perPixel(float *paddedImage, float *outputImage, int width, int 
     // 2d shared memory according to block size
     __shared__ float share_buf[MAX_THREAD_DIM_SHARED][MAX_THREAD_DIM_SHARED];
 
-    // calculate i and j with blocksize and threadid
-    // int i = blockIdx.x * blockDim.x + threadIdx.x;
-    // int j = blockIdx.y * blockDim.y + threadIdx.y;
     int i = threadIdx.x;
     int j = threadIdx.y;
 
-    // int padI = 1 * MAX_THREAD_DIM + threadIdx.x;
-    // int padJ = 1 * MAX_THREAD_DIM + threadIdx.y;
     int padI = blockIdx.x * blockDim.x + threadIdx.x;
     int padJ = blockIdx.y * blockDim.y + threadIdx.y;
 
-    // printf("threadIdx.x: %d ; threadIdx.y: %d ", threadIdx.x, threadIdx.y);
-
-    // if (threadIdx.x == 0 and threadIdx.y == 0 and blockIdx.x == 0 and blockIdx.y == 0)
-    // {
-    //     printf("MAX_THREAD_DIM_SHARED: %d \n", MAX_THREAD_DIM_SHARED);
-    //     printf("i: %d ; j: %d \n", i, j);
-    //     printf("blockDim.x: %d ; blockDim.y: %d \n", blockDim.x, blockDim.y);
-    //     printf("blockIdx.x: %d ; blockIdx.y: %d \n", blockIdx.x, blockIdx.y);
-    //     printf("threadIdx.x: %d ; threadIdx.y: %d \n", threadIdx.x, threadIdx.y);
-    //     printf("height: %d ; width: %d \n", height, width);
-    //     printf("rows: %d ; cols: %d \n", rows, cols);
-    // }
-
-    // int padI = halfSearchWindowSize + halfWindowSize + i;
-    // int padJ = halfSearchWindowSize + halfWindowSize + j;
-
-    // let 1 thread load all the data into shared memory
-    // TODO: This can technically be distributed to all threads smartly
-    // printf("blockIdx.x: %d ; blockIdx.y: %d; i: %d ; j: %d threadId.x: %d ; threadId.y: %d \n", blockIdx.x, blockIdx.y, i, j, threadIdx.x, threadIdx.y);
-
-    if (threadIdx.x == 0 and threadIdx.y == 0)
+    // using threads to bring data to the shared memory
+    for (int jt = 0; jt < MAX_THREAD_DIM_SHARED; jt++)
     {
-
-        for (int it = 0; it < MAX_THREAD_DIM_SHARED; it++)
-        {
-            for (int jt = 0; jt < MAX_THREAD_DIM_SHARED; jt++)
-            {
-                // printf("i: %d ; j: %d \nit: %d ; jt: %d \n\n", i, j, it, jt);
-                share_buf[it][jt] = paddedImage[(padI + it) * width + (padJ + jt)];
-            }
-        }
+        share_buf[i][jt] = paddedImage[(blockIdx.x * blockDim.x + i) * width + (blockIdx.y * blockDim.y + jt)];
+        share_buf[i+32][jt] = paddedImage[(blockIdx.x * blockDim.x + i+32) * width + (blockIdx.y * blockDim.y + jt)];
     }
-
-    // printf("threadIdx.x: %d ; threadIdx.y: %d ", threadIdx.x, threadIdx.y);
-
     __syncthreads();
 
     float weightedSum = 0;
     float similaritySum = 0;
+    float h_const = 1/(h);
 
     for (int k = 0; k < sWindowSize; k++)
     {
@@ -93,50 +60,44 @@ __global__ void perPixel(float *paddedImage, float *outputImage, int width, int 
             float dist = 0;
             for (int m = 0; m < nWindowSize; m++)
             {
-                for (int n = 0; n < nWindowSize; n++)
-                {
-                    // if (threadIdx.x == 0 and threadIdx.y == 0)
-                    // {
-                    //     printf("k + m + i: %d ; l + n + j: %d \nm + i + halfSearchWindowSize: %d n + j +halfSearchWindowSize: %d\n", k + m + i, l + n + j, m + i + halfSearchWindowSize, n + j + halfSearchWindowSize);
-                    // }
-                    dist += pow(share_buf[k + m + i][l + n + j] - share_buf[m + i + halfSearchWindowSize][n + j + halfSearchWindowSize], 2);
-                }
+                float dist1, dist2, dist3, dist4, dist5, dist6, dist7, dist8, dist9, dist10, dist11;
+                dist1 = share_buf[k + m + i][l + 0 + j] - share_buf[m + i + halfSearchWindowSize][0 + j + halfSearchWindowSize];
+                dist2 = share_buf[k + m + i][l + 1 + j] - share_buf[m + i + halfSearchWindowSize][1 + j + halfSearchWindowSize];
+                dist3 = share_buf[k + m + i][l + 2 + j] - share_buf[m + i + halfSearchWindowSize][2 + j + halfSearchWindowSize];
+                dist4 = share_buf[k + m + i][l + 3 + j] - share_buf[m + i + halfSearchWindowSize][3 + j + halfSearchWindowSize];
+                dist5 = share_buf[k + m + i][l + 4 + j] - share_buf[m + i + halfSearchWindowSize][4 + j + halfSearchWindowSize];
+                dist6 = share_buf[k + m + i][l + 5 + j] - share_buf[m + i + halfSearchWindowSize][5 + j + halfSearchWindowSize];
+                dist7 = share_buf[k + m + i][l + 6 + j] - share_buf[m + i + halfSearchWindowSize][6 + j + halfSearchWindowSize];
+                dist8 = share_buf[k + m + i][l + 7 + j] - share_buf[m + i + halfSearchWindowSize][7 + j + halfSearchWindowSize];
+                dist9 = share_buf[k + m + i][l + 8 + j] - share_buf[m + i + halfSearchWindowSize][8 + j + halfSearchWindowSize];
+                dist10 = share_buf[k + m + i][l + 9 + j] - share_buf[m + i + halfSearchWindowSize][9 + j + halfSearchWindowSize];
+                dist11 = share_buf[k + m + i][l + 10 + j] - share_buf[m + i + halfSearchWindowSize][10 + j + halfSearchWindowSize];
+                dist1 = dist1 * dist1;
+                dist2 = dist2 * dist2;
+                dist3 = dist3 * dist3;
+                dist4 = dist4 * dist4;
+                dist5 = dist5 * dist5;
+                dist6 = dist6 * dist6;
+                dist7 = dist7 * dist7;
+                dist8 = dist8 * dist8;
+                dist9 = dist9 * dist9;
+                dist10 = dist10 * dist10;
+                dist11 = dist11 * dist11;
+                dist += dist1 + dist2 + dist3 + dist4 + dist5 + dist6 + dist7 + dist8 + dist9 + dist10 + dist11;
             }
-            // cout<<dist<<endl;
             dist = sqrt(dist);
-            // // cout<<dist<<endl;
-            float w = exp(-dist / (h));
+            float w = exp(-dist * h_const);
 
-            // if (threadIdx.x == 0 and threadIdx.y == 0)
-            // {
-            //     printf("k: %d ; l: %d i: %d ; j: %d \n", k, l, i, j);
-            //     printf("k + i halfWindowSize: %d ; k + i halfWindowSize: %d \n\n", k + i + halfWindowSize, l + j + halfWindowSize);
-            // }
             weightedSum += w * share_buf[k + i + halfWindowSize][l + j + halfWindowSize];
             similaritySum += w;
         }
     }
     float intensity = weightedSum / similaritySum;
 
-    // printf("i: %d ; j: %d; i * cols + j: %d \n", i, j, i * cols + j);
     outputImage[padI * cols + padJ] = intensity;
     __syncthreads();
 }
 
-// __syncthreads();
-// for (int it = 0; it < blockDim.x; it++)
-// {
-//     for (int jt = 0; jt < blockDim.y; jt++)
-//     {
-//         outputImage[i * rows + jt] = share_buf[it][jt];
-//     }
-// }
-
-// for (int jt = 0; jt < cols; jt++)
-// {
-//     // printf("here");
-//     outputImage[i * rows + jt] = share_buf[jt];
-// }
 
 int findSqaureNum(int n)
 {
@@ -152,9 +113,9 @@ cv::Mat NL_Means(cv::Mat src)
     int rows = src.rows;
     int cols = src.cols;
 
-    int h = H;
-    int halfWindowSize = nWindowSize / 2;
-    int halfSearchWindowSize = sWindowSize / 2;
+    // int h = H;
+    // int halfWindowSize = nWindowSize / 2;
+    // int halfSearchWindowSize = sWindowSize / 2;
     // cout << "nWindowSize: " << nWindowSize << endl;
     // cout << "sWindowSize: " << sWindowSize << endl;
 
