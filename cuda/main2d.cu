@@ -8,8 +8,6 @@
 using namespace std;
 
 // #def data folder
-#define imgH 256
-#define imgW 256
 // #define sWindowSize 21
 // #define nWindowSize 13
 #define sWindowSize 23
@@ -19,7 +17,6 @@ using namespace std;
 #define MAX_THREADS 1024
 #define MAX_BLOCKS 1024
 #define MAX_THREAD_DIM 32
-#define MAX_BLOCK_DIM 256/32
 
 // run using: g++ -std=c++11 main.cpp -o main `pkg-config --cflags --libs opencv`
 // run using: nvcc -std=c++11 main.cpp -o main `pkg-config --cflags --libs opencv`
@@ -147,18 +144,10 @@ int findSqaureNum(int n)
     return i - 1;
 }
 
-cv::Mat NL_Means(cv::Mat src)
+cv::Mat NL_Means(cv::Mat src, int MAX_BLOCK_DIM)
 {
     int rows = src.rows;
     int cols = src.cols;
-
-    int h = H;
-    int halfWindowSize = nWindowSize / 2;
-    int halfSearchWindowSize = sWindowSize / 2;
-    // cout << "nWindowSize: " << nWindowSize << endl;
-    // cout << "sWindowSize: " << sWindowSize << endl;
-
-    // cout << "Performing NL_Means on the Image" << endl;
 
     vector<vector<float>> paddedImageVec = padImage(src, sWindowSize);
     paddedImageVec = floatImage(paddedImageVec);
@@ -248,12 +237,11 @@ cv::Mat NL_Means(cv::Mat src)
 
 int main(int argc, char **argv)
 {
-    auto start_time = std::chrono::steady_clock::now(); 
-    // string image_path
-    // cout << "Loading image " << image_path << endl;
+    const int imgSize = stoi(argv[1]);
+    const int MAX_BLOCK_DIM = imgSize/32;
     cv::Mat src = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
-    src = resizeImage(src, imgH, imgW);
-    // cout << "Shape of image: " << src.size() << endl;
+    src = resizeImage(src, imgSize, imgSize);
+    cout << "Shape of image: " << src.size() << endl;
 
     // checkDevice();
 
@@ -264,13 +252,13 @@ int main(int argc, char **argv)
         cout << "Usage: " << argv[0] << " <Input image>" << endl;
         return -1;
     }
-    NL_Means(src);
 
-    // cout << "Done!" << endl;
-    auto end_time = std::chrono::steady_clock::now(); 
-    auto runtime = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time); 
-    
-    std::cout << "Runtime: " << runtime.count() << "ms" << std::endl; 
+    auto start_time = std::chrono::steady_clock::now();
+    NL_Means(src,MAX_BLOCK_DIM);
+    auto end_time = std::chrono::steady_clock::now();
+    auto runtime = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+    std::cout << "Runtime: " << runtime.count() << "ms" << std::endl;
 
     return 0;
 }
