@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 #include "helper.h"
+#include <chrono>
+
 
 using namespace std;
 
@@ -27,7 +29,7 @@ cv::Mat NL_Means(cv::Mat src, float h = 0.5, int windowSize=11, int searchWindow
     vector<vector<float> > outputImage(rows, vector<float>(cols));
 
     for(int i=0; i<rows;i++){
-        cout<<i<<endl;
+        // cout<<i<<endl;
         for(int j=0; j<cols; j++){
             float weightedSum = 0;
             float similaritySum = 0;
@@ -80,13 +82,25 @@ cv::Mat NL_Means(cv::Mat src, float h = 0.5, int windowSize=11, int searchWindow
     return dst;
 }
 
+cv::Mat resizeImage(cv::Mat src, int imgH, int imgW)
+{
+    // resize to imgH x imgW
+    cv::Mat dst;
+    cv::resize(src, dst, cv::Size(imgW, imgH), 0, 0, cv::INTER_LINEAR);
+    cv::imwrite("resizedImage.png", dst);
+    return dst;
+}
+
 int main(int argc, char **argv)
 {
 
     // string image_path
     cout << "Loading image " << image_path << endl;
 
+    const int imgSize = stoi(argv[1]);
     cv::Mat src = cv::imread(image_path, cv::IMREAD_GRAYSCALE);
+    src = resizeImage(src, imgSize, imgSize);
+
 
     cout << "Shape of image: " << src.size() << endl;
 
@@ -97,7 +111,13 @@ int main(int argc, char **argv)
         cout << "Usage: " << argv[0] << " <Input image>" << endl;
         return -1;
     }
+    auto start_time = std::chrono::steady_clock::now();
     NL_Means(src);
+    auto end_time = std::chrono::steady_clock::now();
+    auto runtime = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+    std::cout << "Runtime: " << runtime.count() << "ms" << std::endl;
+
 
     return 0;
 }
