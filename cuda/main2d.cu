@@ -110,14 +110,6 @@ cv::Mat NL_Means(cv::Mat src, int MAX_BLOCK_DIM)
     int rows = src.rows;
     int cols = src.cols;
 
-    // int h = H;
-    // int halfWindowSize = nWindowSize / 2;
-    // int halfSearchWindowSize = sWindowSize / 2;
-    // cout << "nWindowSize: " << nWindowSize << endl;
-    // cout << "sWindowSize: " << sWindowSize << endl;
-
-    // cout << "Performing NL_Means on the Image" << endl;
-
     vector<vector<float>> paddedImageVec = padImage(src, sWindowSize);
     paddedImageVec = floatImage(paddedImageVec);
 
